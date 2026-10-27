@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
+import { auth, googleProvider } from "./firebase";
 
 type AnswerValue = string | number | string[];
 type Answers = Record<string, AnswerValue>;
-type AuthProvider = "Google" | "Facebook" | "Email";
+type AuthProvider = "Google" | "Email";
 type ResultsTab = "colleges" | "scholarships" | "saved";
 type AdVariant = "leaderboard" | "sidebar";
 type PlanTier = "free" | "pro";
@@ -852,8 +861,39 @@ function persistAuthUser(user: AuthUser | null) {
 }
 
 function App() {
-  const [authUser, setAuthUser] = useState<AuthUser | null>(loadAuthUser);
-  const [authForm, setAuthForm] = useState({ name: "", email: "" });
+    useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const name =
+          user.displayName ||
+          user.email?.split("@")[0] ||
+          "Student";
+
+        setAuthUser({
+          name,
+          email: user.email || "",
+          provider: user.providerData.some(
+            (item) => item.providerId === "google.com"
+          )
+            ? "Google"
+            : "Email",
+        });
+      } else {
+        setAuthUser(null);
+      }
+
+      setAuthReady(true);
+    });
+
+    return unsubscribe;
+  }, []);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+const [authReady, setAuthReady] = useState(false);
+const [authForm, setAuthForm] = useState({
+  name: "",
+  email: "",
+  password: "",
+});
   const [answers, setAnswers] = useState<Answers>(defaultAnswers);
   const [step, setStep] = useState(0);
   const [view, setView] = useState<"survey" | "results">("survey");
@@ -943,27 +983,60 @@ function App() {
     }
   };
 
-  const signInWithProvider = async (provider: AuthProvider) => {
-    const user = {
-      name: `${provider} Student`,
-      email: `${provider.toLowerCase()}-student@campusfit.local`,
-      provider,
-    };
-    await sendLoginToGoogleForm(user);
-    setAuthUser(user);
-    persistAuthUser(user);
-  };
+  
+const signInWithProvider = async (provider: AuthProvider) => {
+  if (provider !== "Google") return;
 
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (error) {
+    console.error("Google sign-in failed:", error);
+
+    const firebaseError = error as {
+      code?: string;
+      message?: string;
+    };
+
+    alert(
+      `Google sign-in failed.\n${firebaseError.code ?? ""}\n${
+        firebaseError.message ?? "Please try again."
+      }`
+    );
+  }
+};
+  
   const signInWithEmail = async () => {
     const email = authForm.email.trim();
-    const name = authForm.name.trim() || email.split("@")[0] || "CampusFit Student";
+    const name = authForm.name.trim();
+
     if (!email.includes("@")) {
+      alert("Please enter a valid email address.");
       return;
     }
-    const user = { name, email, provider: "Email" as AuthProvider };
-    await sendLoginToGoogleForm(user);
-    setAuthUser(user);
-    persistAuthUser(user);
+
+    if (!authForm.password || authForm.password.length < 6) {
+      alert("Please enter a password with at least 6 characters.");
+      return;
+    }
+
+    try {
+      const result = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        authForm.password
+      );
+
+      if (name) {
+        await updateProfile(result.user, {
+          displayName: name,
+        });
+      }
+    } catch (error) {
+      console.error("Email sign-up failed:", error);
+      alert(
+        "Could not create your account. This email may already be registered, or the password may be invalid."
+      );
+    }
   };
 
   const signOut = () => {
@@ -1479,20 +1552,28 @@ function LoginScreen({
   onProviderSignIn,
   onEmailSignIn,
 }: {
-  form: { name: string; email: string };
-  onFormChange: (form: { name: string; email: string }) => void;
+  form: { name: string; email: string; password: string };
+  onFormChange: (form: {
+    name: string;
+    email: string;
+    password: string;
+  }) => void;
   onProviderSignIn: (provider: AuthProvider) => void;
   onEmailSignIn: () => void;
 }) {
   return (
     <main className="login-shell">
       <section className="login-brand-panel">
-        <img src="/assets/thep-dtr-banner.png" alt="The Higher Ed Plug plus DTR" />
+        <img
+          src="/assets/thep-dtr-banner.png"
+          alt="The Higher Ed Plug plus DTR"
+        />
         <div>
           <p className="eyebrow">The Higher Ed Plug + Disrupting The Regular</p>
           <h1>CampusFit</h1>
           <p>
-            Sign in to build a college fit list, compare affordability, and find source-checked scholarship opportunities.
+            Sign in to build a college fit list, compare affordability, and find
+            source-checked scholarship opportunities.
           </p>
         </div>
       </section>
@@ -1505,13 +1586,13 @@ function LoginScreen({
         <p>Use a connected account or email to begin your match profile.</p>
 
         <div className="oauth-stack">
-          <button className="google-login" type="button" onClick={() => onProviderSignIn("Google")}>
+          <button
+            className="google-login"
+            type="button"
+            onClick={() => onProviderSignIn("Google")}
+          >
             <span>G</span>
             Continue with Google
-          </button>
-          <button className="facebook-login" type="button" onClick={() => onProviderSignIn("Facebook")}>
-            <span>f</span>
-            Continue with Facebook
           </button>
         </div>
 
@@ -1525,29 +1606,55 @@ function LoginScreen({
             <input
               type="text"
               placeholder="Student name"
+              autoComplete="name"
               value={form.name}
-              onChange={(event) => onFormChange({ ...form, name: event.target.value })}
+              onChange={(event) =>
+                onFormChange({ ...form, name: event.target.value })
+              }
             />
           </label>
+
           <label>
             Email address
             <input
               type="email"
               placeholder="student@example.com"
+              autoComplete="email"
               value={form.email}
-              onChange={(event) => onFormChange({ ...form, email: event.target.value })}
+              onChange={(event) =>
+                onFormChange({ ...form, email: event.target.value })
+              }
             />
           </label>
-          <button className="primary full" type="button" onClick={onEmailSignIn} disabled={!form.email.includes("@")}>
+
+          <label>
+            Password
+            <input
+              type="password"
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(event) =>
+                onFormChange({ ...form, password: event.target.value })
+              }
+            />
+          </label>
+
+          <button
+            className="primary full"
+            type="button"
+            onClick={onEmailSignIn}
+            disabled={!form.email.includes("@") || !form.password}
+          >
             Continue with Email
           </button>
         </div>
       </section>
+
       <PlanComparison />
     </main>
   );
 }
-
 function Header({
   onReset,
   plan,
