@@ -984,8 +984,12 @@ const [authForm, setAuthForm] = useState({
   };
 
   
+let googleSignInInProgress = false;
+
 const signInWithProvider = async (provider: AuthProvider) => {
-  if (provider !== "Google") return;
+  if (provider !== "Google" || googleSignInInProgress) return;
+
+  googleSignInInProgress = true;
 
   try {
     await signInWithPopup(auth, googleProvider);
@@ -1002,8 +1006,11 @@ const signInWithProvider = async (provider: AuthProvider) => {
         firebaseError.message ?? "Please try again."
       }`
     );
+  } finally {
+    googleSignInInProgress = false;
   }
 };
+
   
   const signInWithEmail = async () => {
     const email = authForm.email.trim();
@@ -1039,13 +1046,17 @@ const signInWithProvider = async (provider: AuthProvider) => {
     }
   };
 
-  const signOut = () => {
-    setAuthUser(null);
-    persistAuthUser(null);
+  const signOut = async () => {
+  try {
+    await firebaseSignOut(auth);
     setSavedScholarships([]);
     setView("survey");
     setTab("colleges");
-  };
+  } catch (error) {
+    console.error("Sign out failed:", error);
+    alert("Could not sign out. Please try again.");
+  }
+};
 
   const updateAnswer = (key: string, value: AnswerValue) => {
     setAnswers((current) => ({ ...current, [key]: value }));
@@ -1651,7 +1662,12 @@ function LoginScreen({
         </div>
       </section>
 
-      <PlanComparison />
+           <PlanComparison />
+
+      <footer className="login-footer">
+        <a href="/privacy.html">Privacy Policy</a>
+        <span>© {new Date().getFullYear()} CampusFit</span>
+      </footer>
     </main>
   );
 }
@@ -1681,9 +1697,23 @@ function Header({
         <button className={plan === "pro" ? "ghost" : "primary"} onClick={plan === "pro" ? onManageBilling : onUpgrade}>
           {plan === "pro" ? "Manage Billing" : "Upgrade to Pro"}
         </button>
-        <button className="ghost" type="button" onClick={onSignOut}>
-          Sign Out
-        </button>
+        
+        <a className="ghost" href="/privacy.html">
+  Privacy Policy
+</a>
+
+<a
+  className="ghost"
+  href="https://mail.google.com/mail/?view=cm&to=unclej%40thehigheredplug.com"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Contact Support
+</a>
+
+<button className="ghost" type="button" onClick={onSignOut}>
+  Sign Out
+</button>
       </div>
     </header>
   );
