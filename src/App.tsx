@@ -1046,12 +1046,10 @@ const signInWithProvider = async (provider: AuthProvider) => {
     }
   };
 
-  const signOut = async () => {
+ const signOut = async () => {
   try {
     await firebaseSignOut(auth);
     setSavedScholarships([]);
-    setView("survey");
-    setTab("colleges");
   } catch (error) {
     console.error("Sign out failed:", error);
     alert("Could not sign out. Please try again.");
@@ -1263,65 +1261,151 @@ const signInWithProvider = async (provider: AuthProvider) => {
   };
 
   const runScholarshipSearch = async () => {
-    setScholarshipStatus("Finding source-checked funding matches");
-    const effectiveFilters = isPro
-      ? filters
-      : { ...filters, deadline_before: "", min_amount: "", min_fit: "" };
-    const params = buildScholarshipQuery(answers, effectiveFilters);
+  setScholarshipStatus("Searching scholarships...");
 
-    try {
-      const response = await fetch(`${BACKEND_BASE}/api/scholarships/search?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`Scholarships API returned ${response.status}`);
-      }
-      const data = (await response.json()) as { results: Scholarship[] };
-      setScholarships(data.results || []);
-      setScholarshipStatus(`${data.results?.length || 0} source-checked matches`);
-    } catch (error) {
-      setScholarshipStatus("Live opportunity lookup unavailable");
-      setScholarships([]);
+  const params = buildScholarshipQuery(answers, filters);
+
+  try {
+    const response = await fetch(
+      `${BACKEND_BASE}/api/scholarships/search?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Scholarship API error (${response.status}): ${errorText}`
+      );
     }
 
-    setTab("scholarships");
-  };
+    const data = (await response.json()) as {
+      results?: Scholarship[];
+    };
+
+    const results = data.results || [];
+
+    setScholarships(results);
+    setScholarshipStatus(
+      results.length
+        ? `${results.length} scholarship matches found`
+        : "No scholarships matched these filters. Try changing your search."
+    );
+  } catch (error) {
+    console.error("Scholarship search failed:", error);
+
+    setScholarshipStatus(
+      error instanceof Error
+        ? error.message
+        : "Scholarship search failed. Please try again."
+    );
+
+    setScholarships([]);
+  }
+
+  setTab("scholarships");
+};
 
   const runCollegeSearch = async () => {
-    setCollegeStatus("Checking live public institution profiles");
-    const params = buildCollegeQuery(answers);
+  setCollegeStatus("Checking colleges for your selected location");
+  const params = buildCollegeQuery(answers);
 
-    try {
-      const response = await fetch(`${BACKEND_BASE}/api/colleges/search?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`College API returned ${response.status}`);
-      }
-      const data = (await response.json()) as {
-        results: College[];
-        source?: { label?: string; url?: string; retrieved_live?: boolean };
-      };
-      const liveColleges = data.results?.length ? data.results : COLLEGES;
-      setColleges(scoreColleges(answers, liveColleges));
-      setCollegeSource(data.source?.label || "Live public sources");
-      setCollegeStatus(data.source?.retrieved_live ? "Live public profiles loaded" : "Source-checked profiles loaded");
-    } catch (error) {
-      setColleges(previewColleges);
-      setCollegeSource("Local starter profile set");
-      setCollegeStatus("Live profile lookup unavailable; using starter data");
+  
+const selectedStateRaw = String(answers.preferred_state || "").trim();
+
+const normalizeState = (value: unknown): string => {
+  const raw = String(value ?? "").trim().toLowerCase();
+
+  if (!raw || raw === "no preference" || raw === "any") {
+    return "";
+  }
+
+  const entry = Object.entries(STATES).find(
+    ([name, abbreviation]) =>
+      name.toLowerCase() === raw ||
+      abbreviation.toLowerCase() === raw
+  );
+
+  if (entry) return entry[1].toUpperCase();
+
+  if (raw === "dc" || raw === "district of columbia") return "DC";
+
+  return raw.toUpperCase();
+};
+
+const selectedState = normalizeState(selectedStateRaw);
+
+const matchesSelectedState = (college: College) => {
+  if (!selectedState) return true;
+
+  return normalizeState(college.state) === selectedState;
+};
+
+
+  try {
+    const response = await fetch(
+      `${BACKEND_BASE}/api/colleges/search?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`College API returned ${response.status}`);
     }
 
-    setView("results");
-    setTab("colleges");
-  };
+    const data = (await response.json()) as {
+      results: College[];
+      source?: {
+        label?: string;
+        url?: string;
+        retrieved_live?: boolean;
+      };
+    };
 
-  if (!authUser) {
-    return (
-      <LoginScreen
-        form={authForm}
-        onFormChange={setAuthForm}
-        onProviderSignIn={signInWithProvider}
-        onEmailSignIn={signInWithEmail}
-      />
+    const sourceColleges = data.results || [];
+    const filteredColleges = sourceColleges.filter(matchesSelectedState);
+
+    setColleges(scoreColleges(answers, filteredColleges));
+    setCollegeSource(data.source?.label || "Live public sources");
+
+    setCollegeStatus(
+      filteredColleges.length
+        ? `${filteredColleges.length} colleges found for your selection`
+        : "No colleges found for that location. Try another state or region."
+    );
+  } catch (error) {
+    console.error("College search failed:", error);
+
+    const fallbackResults = previewColleges.filter(matchesSelectedState);
+
+    setColleges(fallbackResults);
+    setCollegeSource("Local starter profiles");
+
+    setCollegeStatus(
+      fallbackResults.length
+        ? "Live search unavailable. Showing matching starter profiles."
+        : "No matching starter profiles found for that location."
     );
   }
+
+  setView("results");
+  setTab("colleges");
+};
+
+ if (!authReady) {
+  return (
+    <main className="app-shell">
+      <p>Loading CampusFit...</p>
+    </main>
+  );
+}
+
+if (!authUser) {
+  return (
+    <LoginScreen
+      form={authForm}
+      onFormChange={setAuthForm}
+      onProviderSignIn={signInWithProvider}
+      onEmailSignIn={signInWithEmail}
+    />
+  );
+}
 
   if (view === "results") {
     return (
@@ -1417,7 +1501,22 @@ const signInWithProvider = async (provider: AuthProvider) => {
           onClose={() => setShowUpgrade(false)}
           onUpgrade={beginUpgrade}
         />
-        <UncleJChat open={showUncleJ} onClose={() => setShowUncleJ(false)} />
+        <UncleJChat
+  open={showUncleJ}
+  onClose={() => setShowUncleJ(false)}
+/>
+
+<footer className="campusfit-footer">
+  <div className="footer-actions">
+    <a href="/privacy.html">Privacy Policy</a>
+
+    <a href="mailto:unclej@thehigheredplug.com">
+      Contact Support
+    </a>
+  </div>
+
+  <span>© {new Date().getFullYear()} CampusFit</span>
+</footer>
       </main>
     );
   }
@@ -1434,7 +1533,9 @@ const signInWithProvider = async (provider: AuthProvider) => {
       <section className="survey-hero">
         <div className="hero-copy">
           <p className="eyebrow">The Higher Ed Plug + Disrupting The Regular</p>
-          <h1>CampusFit</h1>
+          <h1>
+  CampusFit <span className="beta-label">beta</span>
+</h1>
           <p>
             A college and scholarship matching experience built for practical decisions:
             fit, affordability, support, and next steps.
@@ -1528,6 +1629,28 @@ const signInWithProvider = async (provider: AuthProvider) => {
         onClose={() => setShowUpgrade(false)}
         onUpgrade={beginUpgrade}
       />
+      <footer className="campusfit-footer">
+  <div className="footer-actions">
+    <button
+      className="ghost"
+      type="button"
+      onClick={signOut}
+    >
+      Sign Out
+    </button>
+
+    <a href="/privacy.html">Privacy Policy</a>
+<a
+  href="https://mail.google.com/mail/?view=cm&to=unclej%40thehigheredplug.com"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Contact Support
+</a>
+  </div>
+
+  <span>© {new Date().getFullYear()} CampusFit</span>
+</footer>
     </main>
   );
 }
@@ -1664,10 +1787,23 @@ function LoginScreen({
 
            <PlanComparison />
 
-      <footer className="login-footer">
-        <a href="/privacy.html">Privacy Policy</a>
-        <span>© {new Date().getFullYear()} CampusFit</span>
-      </footer>
+    <footer className="campusfit-footer">
+  <div className="footer-actions">
+{/* Sign Out button temporarily removed */}
+
+    <a href="/privacy.html">Privacy Policy</a>
+
+   <a
+  href="https://mail.google.com/mail/?view=cm&to=unclej%40thehigheredplug.com"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Contact Support
+</a>
+  </div>
+
+  <span>© {new Date().getFullYear()} CampusFit</span>
+</footer>
     </main>
   );
 }
@@ -1690,13 +1826,25 @@ function Header({
         <img src="/assets/thep-dtr-banner.png" alt="The Higher Ed Plug plus DTR" />
       </button>
       <div className="account-actions">
-        <div className={`plan-badge ${plan}`}>
-          <span>{plan === "pro" ? "CampusFit Pro" : "CampusFit Free"}</span>
-          <strong>{plan === "pro" ? "Premium tools unlocked" : "Core matching access"}</strong>
-        </div>
-        <button className={plan === "pro" ? "ghost" : "primary"} onClick={plan === "pro" ? onManageBilling : onUpgrade}>
-          {plan === "pro" ? "Manage Billing" : "Upgrade to Pro"}
-        </button>
+      <div className={`plan-badge ${plan}`}>
+  <span>
+    {plan === "pro" ? "CampusFit Pro" : "CampusFit Free"}
+    {plan === "pro" && (
+      <span className="pro-coming-soon">Coming Soon</span>
+    )}
+  </span>
+  <strong>{plan === "pro" ? "Premium tools unlocked" : "Core matching access"}</strong>
+</div>
+        <div className="header-upgrade">
+  <button
+    className={plan === "pro" ? "ghost" : "primary"}
+    onClick={plan === "pro" ? onManageBilling : onUpgrade}
+  >
+    {plan === "pro" ? "Manage Billing" : "Upgrade to Pro"}
+  </button>
+
+  <span className="pro-coming-soon">Coming Soon</span>
+</div>
         
         <a className="ghost" href="/privacy.html">
   Privacy Policy
@@ -1711,9 +1859,6 @@ function Header({
   Contact Support
 </a>
 
-<button className="ghost" type="button" onClick={onSignOut}>
-  Sign Out
-</button>
       </div>
     </header>
   );
@@ -1733,15 +1878,18 @@ function PlanComparison() {
           <li>Direct admissions and scholarship source links</li>
         </ul>
       </article>
+
       <article className="plan-card pro">
         <p className="eyebrow">Upgrade</p>
-        <h2>CampusFit Pro</h2>
+       <h2>CampusFit Pro</h2>
         <strong>{PRO_PRICE_LABEL}</strong>
+
+        <p className="pro-frame-notice">Coming Soon!</p>
+
         <ul>
           {PRO_FEATURES.map((feature) => (
             <li key={feature.label}>
               {feature.label}
-              {feature.status === "coming" ? <small>Coming soon</small> : null}
             </li>
           ))}
         </ul>
@@ -1750,42 +1898,34 @@ function PlanComparison() {
   );
 }
 
-function ResponsiveDisplayAd({ variant, placement }: { variant: AdVariant; placement: string }) {
-  const adContent = (
-    <>
-      <div className="ad-copy">
-        <span>Sponsored</span>
-        <b>{DISPLAY_AD_CONFIG.sponsorName}</b>
-        <strong>{DISPLAY_AD_CONFIG.headline}</strong>
-        <p>{DISPLAY_AD_CONFIG.body}</p>
-      </div>
-      <span className="ad-cta">{DISPLAY_AD_CONFIG.cta}</span>
-    </>
-  );
 
-  const className = `display-ad display-ad-${variant}`;
-  const trackingProps = {
-    "data-ad-placement": placement,
-    "data-ad-slot": DISPLAY_AD_CONFIG.slotId,
-    "data-ad-format": "auto",
-    "data-full-width-responsive": "true",
-    "data-affiliate-id": DISPLAY_AD_CONFIG.affiliateId,
-  };
-
-  if (DISPLAY_AD_CONFIG.url) {
-    return (
-      <a className={className} href={DISPLAY_AD_CONFIG.url} target="_blank" rel="sponsored noreferrer" {...trackingProps}>
-        {adContent}
-      </a>
-    );
-  }
-
+function ResponsiveDisplayAd({
+  variant,
+  placement,
+}: {
+  variant: AdVariant;
+  placement: string;
+}) {
   return (
-    <aside className={className} aria-label="Sponsored partner placement" {...trackingProps}>
-      {adContent}
-    </aside>
+    <a
+      className={`display-ad display-ad-${variant}`}
+      href="https://www.thehigheredplug.com/"
+      target="_blank"
+      rel="sponsored noopener noreferrer"
+      aria-label="Visit The Higher Ed Plug"
+      data-ad-placement={placement}
+    >
+      <img
+        src="/3829.png"
+        alt="The Higher Ed Plug advertisement"
+        className="display-ad-image"
+      />
+    </a>
   );
 }
+
+
+
 
 function BillingNotice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   if (!message) {
@@ -2084,7 +2224,7 @@ function CollegeResults({
   return (
     <section className="result-layout">
       <aside className="insight-panel">
-        <ResponsiveDisplayAd variant="sidebar" placement="college-results-sidebar" />
+        
         <p className="eyebrow">Profile Signal</p>
         <h2>{String(answers.major)}</h2>
         <div className="source-note">
@@ -2189,7 +2329,7 @@ function SavedListsFolder({
         <button className="primary full" onClick={onScholarships}>
           Find Scholarships
         </button>
-        <ResponsiveDisplayAd variant="sidebar" placement="saved-schools-sidebar" />
+      
       </aside>
 
       <div className="saved-list-content">
@@ -2441,7 +2581,7 @@ function ScholarshipResults({
         </button>
         <span className="status-pill">{status}</span>
       </div>
-      <ResponsiveDisplayAd variant="leaderboard" placement="scholarship-results-inline" />
+     
 
       {scholarships.length === 0 ? (
         <div className="empty-state">
@@ -2473,6 +2613,7 @@ function ScholarshipResults({
           ) : null}
         </div>
       )}
+      <ResponsiveDisplayAd variant="leaderboard" placement="scholarship-results-bottom" />
     </section>
   );
 }
