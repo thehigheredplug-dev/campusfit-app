@@ -723,6 +723,13 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
+  padding: clamp(16px, 2.5vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
 }
 
 .section-rail button {
@@ -2099,3 +2106,22 @@ body {
   border-right: none;
   outline: none;
 }
+
+.journey-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 5px;
+  width: 100%;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.journey-logo img {
+  width: min(100%, 210px);
+  height: auto;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+}
+

@@ -1563,11 +1563,15 @@ if (!authUser) {
               {section.title}
             </button>
           ))}
-          <button className="match-tab" onClick={runCollegeSearch}>
-            <span>06</span>
-            Match
-          </button>
-        </aside>
+<button className="match-tab" onClick={runCollegeSearch}>
+  <span>06</span>
+  Match
+</button>
+
+<div className="journey-logo">
+  <img src="/assets/thep-dtr-banner.png" alt="The Plug" />
+</div>
+</aside>
 
         <section className={`question-panel ${currentSection.accent}`}>
           <div className="arrow-nav" aria-label="Section navigation">
@@ -2273,6 +2277,16 @@ function CollegeResults({
             onUpgrade={onUpgrade}
           />
         ) : null}
+        <div className="new-search-container">
+  <button
+    className="primary new-search-button"
+    onClick={() => {
+      window.location.href = "/";
+    }}
+  >
+    New Search
+  </button>
+</div>
       </div>
     </section>
   );
@@ -2361,6 +2375,16 @@ function SavedListsFolder({
             </div>
           </section>
         ) : null}
+        <div className="new-search-container">
+  <button
+    className="primary new-search-button"
+    onClick={() => {
+      window.location.href = "/";
+    }}
+  >
+    New Search
+  </button>
+</div>
       </div>
     </section>
   );
@@ -2608,6 +2632,16 @@ function ScholarshipResults({
           ) : null}
         </div>
       )}
+      <div className="new-search-container">
+  <button
+    className="primary new-search-button"
+    onClick={() => {
+      window.location.href = "/";
+    }}
+  >
+    New Search
+  </button>
+</div>
       <ResponsiveDisplayAd variant="leaderboard" placement="scholarship-results-bottom" />
     </section>
   );
