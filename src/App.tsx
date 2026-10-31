@@ -1882,7 +1882,7 @@ function PlanComparison() {
       <article className="plan-card pro">
         <p className="eyebrow">Upgrade</p>
        <h2>CampusFit Pro</h2>
-        <strong>{PRO_PRICE_LABEL}</strong>
+        <strong>Pro Features Coming Soon!</strong>
 
         <p className="pro-frame-notice">Coming Soon!</p>
 
@@ -1971,24 +1971,20 @@ function UpgradeModal({
         </button>
         <p className="eyebrow">CampusFit Pro</p>
         <h2 id="upgrade-title">Unlock Deeper College Planning</h2>
-        <p className="upgrade-price">{PRO_PRICE_LABEL}</p>
+        <p className="upgrade-price">Pro Features Coming Soon!</p>
         <div className="upgrade-feature-grid">
           {PRO_FEATURES.map((feature) => (
             <div key={feature.label}>
-              <span>{feature.status === "coming" ? "Soon" : "Pro"}</span>
+             <span>Pro</span>
               <b>{feature.label}</b>
             </div>
           ))}
         </div>
         {message ? <p className="modal-message">{message}</p> : null}
-        <button className="primary full" type="button" onClick={onUpgrade}>
-          {billingConfigured ? "Continue to Secure Checkout" : "Set Up Pro Checkout"}
-        </button>
-        {!billingConfigured ? (
-          <small>Stripe keys and a recurring Price ID must be added to the deployment before live charges can begin.</small>
-        ) : (
-          <small>Payment and subscription management are securely hosted by Stripe.</small>
-        )}
+       <button className="primary full" type="button" disabled>
+  Pro Coming Soon!
+</button>
+      
       </section>
     </div>
   );
@@ -2030,7 +2026,7 @@ function ProToolbox({
         </button>
         {!isPro ? (
           <button type="button" className="primary" onClick={onUpgrade}>
-            Unlock CampusFit Pro
+          Unlock CampusFit Pro — Coming Soon!
           </button>
         ) : null}
       </div>
@@ -2093,7 +2089,7 @@ function UncleJChat({ open, onClose }: { open: boolean; onClose: () => void }) {
         <div className="chat-heading">
           <div>
             <p className="eyebrow">CampusFit Pro</p>
-            <h2 id="uncle-j-title">DTR Uncle J</h2>
+            <h2 id="uncle-j-title">DTR Uncle J Chatbot</h2>
           </div>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close DTR Uncle J">
             x
@@ -2225,7 +2221,7 @@ function CollegeResults({
     <section className="result-layout">
       <aside className="insight-panel">
         
-        <p className="eyebrow">Profile Signal</p>
+       <p className="eyebrow">Scholar Profile</p>
         <h2>{String(answers.major)}</h2>
         <div className="source-note">
           <b>{status}</b>
@@ -2272,7 +2268,7 @@ function CollegeResults({
         ))}
         {!isPro && colleges.length > FREE_COLLEGE_LIMIT ? (
           <LockedFeaturePanel
-            title={`${colleges.length - FREE_COLLEGE_LIMIT} More College Matches`}
+            title={`More College Matches`}
             description="CampusFit Pro removes the match limit and keeps the full ranked list available."
             onUpgrade={onUpgrade}
           />
@@ -2550,7 +2546,6 @@ function ScholarshipResults({
           <input
             type="date"
             value={filters.deadline_before}
-            disabled={!isPro}
             onChange={(event) => onFilterChange({ ...filters, deadline_before: event.target.value })}
           />
         </label>
@@ -2561,18 +2556,18 @@ function ScholarshipResults({
             min="0"
             step="250"
             value={filters.min_amount}
-            disabled={!isPro}
+            
             onChange={(event) => onFilterChange({ ...filters, min_amount: event.target.value })}
           />
         </label>
         <label>
-          Minimum fit
+         Minimum Fit %
           <input
             type="number"
             min="0"
             max="100"
             value={filters.min_fit}
-            disabled={!isPro}
+           
             onChange={(event) => onFilterChange({ ...filters, min_fit: event.target.value })}
           />
         </label>
