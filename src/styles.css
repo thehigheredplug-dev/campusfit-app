@@ -2125,3 +2125,22 @@ body {
   display: block;
 }
 
+.journey-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 12px;
+  width: 100%;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.journey-logo img {
+  width: min(100%, 210px);
+  height: auto;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+}

@@ -1358,21 +1358,38 @@ const matchesSelectedState = (college: College) => {
       };
     };
 
-    const sourceColleges = data.results || [];
-    const filteredColleges = sourceColleges.filter(matchesSelectedState);
+   const sourceColleges = data.results || [];
+const filteredColleges = sourceColleges.filter(matchesSelectedState);
 
-    setColleges(scoreColleges(answers, filteredColleges));
-    setCollegeSource(data.source?.label || "Live public sources");
+const fallbackResults = previewColleges.filter(matchesSelectedState);
 
-    setCollegeStatus(
-      filteredColleges.length
-        ? `${filteredColleges.length} colleges found for your selection`
-        : "No colleges found for that location. Try another state or region."
-    );
+const resultsToShow = filteredColleges.length
+  ? filteredColleges
+  : fallbackResults;
+
+setColleges(scoreColleges(answers, resultsToShow));
+
+setCollegeSource(
+  filteredColleges.length
+    ? data.source?.label || "Live public sources"
+    : "Local starter profiles"
+);
+
+setCollegeStatus(
+  filteredColleges.length
+    ? `${filteredColleges.length} colleges found for your selection`
+    : fallbackResults.length
+      ? "Live search unavailable. Showing matching starter profiles."
+      : "No colleges found for that location. Try another state or region."
+);
   } catch (error) {
     console.error("College search failed:", error);
 
-    const fallbackResults = previewColleges.filter(matchesSelectedState);
+    const stateMatchedFallback = previewColleges.filter(matchesSelectedState);
+
+const fallbackResults = stateMatchedFallback.length
+  ? stateMatchedFallback
+  : previewColleges;
 
     setColleges(fallbackResults);
     setCollegeSource("Local starter profiles");
@@ -1569,7 +1586,7 @@ if (!authUser) {
 </button>
 
 <div className="journey-logo">
-  <img src="/assets/thep-dtr-banner.png" alt="The Plug" />
+  <img src="/assets/thep-favicon.png" alt="The Plug" />
 </div>
 </aside>
 
@@ -2258,7 +2275,7 @@ function CollegeResults({
         </button>
       </aside>
 
-      <div className="college-list">
+            <div className="college-list">
         {visibleColleges.map((college, index) => (
           <CollegeCard
             key={college.id}
@@ -2270,27 +2287,30 @@ function CollegeResults({
             locked={!isPro}
           />
         ))}
-        {!isPro && colleges.length > FREE_COLLEGE_LIMIT ? (
+               {!isPro && colleges.length > FREE_COLLEGE_LIMIT ? (
           <LockedFeaturePanel
-            title={`More College Matches`}
+            title="More College Matches"
             description="CampusFit Pro removes the match limit and keeps the full ranked list available."
             onUpgrade={onUpgrade}
           />
         ) : null}
+
         <div className="new-search-container">
-  <button
-    className="primary new-search-button"
-    onClick={() => {
-      window.location.href = "/";
-    }}
-  >
-    New Search
-  </button>
-</div>
+          <button
+            className="primary new-search-button"
+            type="button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
+          >
+            New Search
+          </button>
+        </div>
       </div>
     </section>
   );
 }
+  
 
 function SavedListsFolder({
   schools,
@@ -2500,7 +2520,18 @@ function ScholarshipResults({
   const nativeSources = buildNativeScholarshipSearches(answers, filters);
   const [email, setEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState("Ready to send full search list");
-  const visibleScholarships = isPro ? scholarships : scholarships.slice(0, FREE_SCHOLARSHIP_LIMIT);
+  const visibleScholarships = useMemo(() => {
+  if (isPro) return scholarships;
+
+  const shuffled = [...scholarships];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled.slice(0, FREE_SCHOLARSHIP_LIMIT);
+}, [scholarships, isPro]);
 
   const sendSourceList = async () => {
     setEmailStatus("Preparing source list");
